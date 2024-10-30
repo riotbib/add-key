@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: 2024 Lennart Mühlenmeier
+#
+# SPDX-License-Identifier: MIT
+
+# Config location
+CONFIG_FILE="$HOME/.config/add-key/config.ini"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "$CONFIG_FILE does not exist."
+    exit
+fi
+
+# Declare associative arrays
+declare -A SSH
+declare -A PASS
+
+# Function to parse the config file
+parse_config() {
+  local section=""
+  while IFS='=' read -r key value; do
+    # Trim whitespace from key and value
+    key=$(echo "$key" | xargs)
+    value=$(echo "$value" | xargs)
+
+    # Check if line starts with a section
+    if [[ $key =~ ^\[(.*)\]$ ]]; then
+      section="${BASH_REMATCH[1]}"
+    elif [[ -n $section && -n $key && -n $value ]]; then
+      # Remove quotes around values
+      value="${value%\"}"
+      value="${value#\"}"
+
+      # Assign to appropriate array based on key
+      if [[ $key == "SSH" ]]; then
+        SSH["$section"]="$value"
+      elif [[ $key == "PASS" ]]; then
+        PASS["$section"]="$value"
+      fi
+    fi
+  done < "$CONFIG_FILE"
+}
+
+# Run the config parser
+parse_config
+
+# Run the actual program
+if [[ "$#" -eq "0" ]]; then
+  echo "Usage: $0 $(echo "${!SSH[@]}" | sed 's/ /|/g')"
+elif [[ "$#" -eq "1" ]]; then
+  [[ ! ${SSH[$1]+_} ]] && echo "Unknown key $1" && exit 1
+  # Add selected key to SSH agent
+  sshpass --run "sshpass -p ${PASS[$1]} -P 'passphrase' ssh-add ${SSH[$1]}"
+fi

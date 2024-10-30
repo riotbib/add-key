@@ -1,0 +1,3 @@
+[main]
+SSH="$HOME/.ssh/id_rsa"
+PASS=$(pass ssh)
